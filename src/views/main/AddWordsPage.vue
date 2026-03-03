@@ -8,12 +8,22 @@ const router = useRouter()
 
 const inputText = ref('')
 
+function normalizeLine(line: string): string {
+  // 1) 非字母和空格全部替换成空格
+  // 2) 多个空格压缩成一个
+  return line
+    .replace(/[^A-Za-z\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 const parsedCount = computed(() => {
   if (!inputText.value.trim()) return 0
   return inputText.value
     .trim()
     .split(/[\n]+/)
-    .filter(line => line.trim())
+    .map(l => normalizeLine(l))
+    .filter(line => line)
     .length
 })
 
@@ -22,7 +32,7 @@ function goToGroup() {
   const lines = inputText.value
     .trim()
     .split(/[\n]+/)
-    .map(l => l.trim())
+    .map(l => normalizeLine(l))
     .filter(Boolean)
   sessionStorage.setItem('pending_words_raw', JSON.stringify(lines))
   router.push('/words/group')
@@ -86,7 +96,7 @@ function goToGroup() {
   min-height: 45vh;
   padding: 16px;
   font-size: 16px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   line-height: 1.8;
   background: var(--color-input-bg);
   border: 1.5px solid transparent;

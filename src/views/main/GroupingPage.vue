@@ -21,6 +21,7 @@ const items = ref<WordItem[]>([])
 const loading = ref(false)
 const selectionStart = ref<number | null>(null)
 const selectionEnd = ref<number | null>(null)
+const tapStart = ref<number | null>(null)
 let nextGroupId = 1
 
 const phraseColors = ['#4F6EF7', '#51CF66', '#FFA94D', '#E64980', '#845EF7', '#20C997']
@@ -74,6 +75,51 @@ function handleMouseMove(index: number) {
   if (selectionStart.value === null) return
   if (items.value[index].groupId !== null) return
   selectionEnd.value = index
+}
+
+function handleChipClick(index: number) {
+  const clicked = items.value[index]
+
+  // 如果已经是短语的一部分：再次点击任意一个单词，整段短语取消
+  if (clicked.groupId !== null) {
+    const gid = clicked.groupId
+    for (const item of items.value) {
+      if (item.groupId === gid) {
+        item.groupId = null
+        item.isPhrase = false
+      }
+    }
+    tapStart.value = null
+    selectionStart.value = null
+    selectionEnd.value = null
+    return
+  }
+
+  // 第一次点击：作为起点，高亮并显示水波纹
+  if (tapStart.value === null) {
+    tapStart.value = index
+    selectionStart.value = index
+    selectionEnd.value = index
+    return
+  }
+
+  const start = Math.min(tapStart.value, index)
+  const end = Math.max(tapStart.value, index)
+
+  if (start !== end) {
+    const canMerge = items.value.slice(start, end + 1).every(i => i.groupId === null)
+    if (canMerge) {
+      const gid = nextGroupId++
+      for (let i = start; i <= end; i++) {
+        items.value[i].groupId = gid
+        items.value[i].isPhrase = true
+      }
+    }
+  }
+
+  tapStart.value = null
+  selectionStart.value = null
+  selectionEnd.value = null
 }
 
 function handleTouchEnd() {
@@ -148,7 +194,7 @@ async function confirmAdd() {
     </div>
 
     <div class="page-content">
-      <TopBanner type="info" message="滑动选中连续单词可合并为短语" />
+      <TopBanner type="info" message="点击首尾词选定短语" />
 
       <div
         class="chips-container"
@@ -160,11 +206,19 @@ async function confirmAdd() {
           v-for="(item, idx) in items"
           :key="idx"
           :data-chip-index="idx"
-          :class="['chip', { selecting: isInSelection(idx), grouped: item.groupId !== null }]"
+          :class="[
+            'chip',
+            {
+              selecting: isInSelection(idx),
+              grouped: item.groupId !== null,
+              'tap-start': tapStart === idx
+            }
+          ]"
           :style="item.groupId !== null ? { background: getGroupColor(item.groupId), color: '#fff' } : {}"
           @touchstart.prevent="handleTouchStart(idx)"
           @mousedown="handleTouchStart(idx)"
           @mouseover="handleMouseMove(idx)"
+          @click="handleChipClick(idx)"
         >
           {{ item.text }}
         </span>
@@ -208,11 +262,13 @@ async function confirmAdd() {
   padding: 8px 16px;
   border-radius: var(--radius-pill);
   font-size: 15px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   background: var(--color-input-bg);
   color: var(--color-text);
   cursor: pointer;
   transition: all 0.15s;
+  position: relative;
+  overflow: hidden;
 }
 
 .chip.selecting {
@@ -222,6 +278,34 @@ async function confirmAdd() {
 
 .chip.grouped {
   font-weight: 500;
+}
+
+.chip.tap-start::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    120deg,
+    rgba(79, 110, 247, 0.2),
+    rgba(81, 207, 102, 0.25),
+    rgba(132, 94, 247, 0.25),
+    rgba(79, 110, 247, 0.2)
+  );
+  background-size: 200% 200%;
+  animation: chip-gradient 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes chip-gradient {
+  0% {
+    opacity: 0.9;
+    background-position: 0% 50%;
+  }
+  100% {
+    opacity: 0;
+    background-position: 100% 50%;
+  }
 }
 
 .summary {

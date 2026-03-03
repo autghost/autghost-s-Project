@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Info, AlertTriangle } from 'lucide-vue-next'
+import { Volume2, AlertTriangle } from 'lucide-vue-next'
 
 defineProps<{
   type?: 'info' | 'warning' | 'offline'
@@ -10,7 +10,7 @@ defineProps<{
 <template>
   <div :class="['top-banner', `top-banner--${type || 'info'}`]">
     <AlertTriangle v-if="type === 'warning' || type === 'offline'" :size="16" />
-    <Info v-else :size="16" />
+    <Volume2 v-else :size="16" />
     <span>{{ message }}</span>
   </div>
 </template>
