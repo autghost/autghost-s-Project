@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, BookOpen } from 'lucide-vue-next'
 import { useDictationStore } from '@/stores/dictation'
 import { useWordsStore } from '@/stores/words'
 import { useAuthStore } from '@/stores/auth'
 import { getDefaultDictationList } from '@/services/dictationService'
+import { translate, getCachedTranslation } from '@/services/translateService'
 import TopBanner from '@/components/TopBanner.vue'
 import AppButton from '@/components/AppButton.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -16,8 +17,24 @@ const wordsStore = useWordsStore()
 const auth = useAuthStore()
 const loading = ref(false)
 
+const translations = reactive<Record<string, string>>({})
+
+function loadTranslations() {
+  for (const word of dictation.candidateWords) {
+    const cached = getCachedTranslation(word.content)
+    if (cached) {
+      translations[word.id] = cached
+    } else {
+      translate(word.content).then(t => { translations[word.id] = t })
+    }
+  }
+}
+
 onMounted(async () => {
-  if (dictation.candidateWords.length > 0) return
+  if (dictation.candidateWords.length > 0) {
+    loadTranslations()
+    return
+  }
 
   loading.value = true
   try {
@@ -26,6 +43,7 @@ onMounted(async () => {
     }
     const list = getDefaultDictationList(wordsStore.words)
     dictation.setCandidates(list)
+    loadTranslations()
   } finally {
     loading.value = false
   }
@@ -90,11 +108,14 @@ function goPickWords() {
             @click="dictation.toggleExclude(word.id)"
           >
             <div :class="['indicator', { active: dictation.excludedIds.has(word.id) }]" />
-            <span
-              :class="['item-text', { strikethrough: dictation.excludedIds.has(word.id) }]"
-            >
-              {{ word.content }}
-            </span>
+            <div class="item-info">
+              <span
+                :class="['item-text', { strikethrough: dictation.excludedIds.has(word.id) }]"
+              >
+                {{ word.content }}
+              </span>
+              <span v-if="translations[word.id]" class="item-translation">{{ translations[word.id] }}</span>
+            </div>
           </div>
         </div>
 
@@ -181,9 +202,23 @@ function goPickWords() {
   background: var(--color-error);
 }
 
+.item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
 .item-text {
   font-size: 15px;
   transition: all 0.15s;
+}
+
+.item-translation {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
 }
 
 .item-text.strikethrough {

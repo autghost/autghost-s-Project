@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { Volume2 } from 'lucide-vue-next'
 import { speak } from '@/services/ttsService'
+import { translate, getCachedTranslation } from '@/services/translateService'
 
 const props = defineProps<{
   word: {
@@ -22,6 +24,17 @@ const emit = defineEmits<{
   play: []
 }>()
 
+const translation = ref('')
+
+onMounted(() => {
+  const cached = getCachedTranslation(props.word.content)
+  if (cached) {
+    translation.value = cached
+  } else {
+    translate(props.word.content).then(t => { translation.value = t })
+  }
+})
+
 function playWord() {
   speak(props.word.content)
   emit('play')
@@ -34,7 +47,10 @@ function playWord() {
     @click="selectable ? emit('select') : undefined"
   >
     <div class="word-main">
-      <span class="word-content">{{ word.content }}</span>
+      <div class="word-info">
+        <span class="word-content">{{ word.content }}</span>
+        <span v-if="translation" class="word-translation">{{ translation }}</span>
+      </div>
       <button class="play-btn" @click.stop="playWord">
         <Volume2 :size="18" />
       </button>
@@ -73,9 +89,23 @@ function playWord() {
   justify-content: space-between;
 }
 
+.word-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
 .word-content {
   font-size: 16px;
   font-weight: 500;
+}
+
+.word-translation {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
 }
 
 .word-card--selected .word-content {

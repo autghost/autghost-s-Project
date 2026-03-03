@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { Volume2 } from 'lucide-vue-next'
 import { useWordsStore } from '@/stores/words'
 import { useAuthStore } from '@/stores/auth'
 import { useDictationStore } from '@/stores/dictation'
 import { speak } from '@/services/ttsService'
+import { translate, getCachedTranslation } from '@/services/translateService'
 import AppButton from '@/components/AppButton.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
@@ -14,11 +15,25 @@ const auth = useAuthStore()
 const wordsStore = useWordsStore()
 const dictation = useDictationStore()
 
+const translations = reactive<Record<string, string>>({})
+
 onMounted(async () => {
   if (auth.databaseId && wordsStore.words.length === 0) {
     await wordsStore.loadWords(auth.databaseId)
   }
+  loadTranslations()
 })
+
+function loadTranslations() {
+  for (const word of wordsStore.errorWords) {
+    const cached = getCachedTranslation(word.content)
+    if (cached) {
+      translations[word.id] = cached
+    } else {
+      translate(word.content).then(t => { translations[word.id] = t })
+    }
+  }
+}
 
 const errorWords = computed(() => wordsStore.errorWords)
 
@@ -63,7 +78,10 @@ function startErrorDictation() {
           <div class="error-bar" />
           <div class="item-main">
             <div class="item-row">
-              <span class="item-text">{{ word.content }}</span>
+              <div class="item-info">
+                <span class="item-text">{{ word.content }}</span>
+                <span v-if="translations[word.id]" class="item-translation">{{ translations[word.id] }}</span>
+              </div>
               <button class="play-btn" @click="playWord(word.content)">
                 <Volume2 :size="18" />
               </button>
@@ -127,9 +145,23 @@ function startErrorDictation() {
   justify-content: space-between;
 }
 
+.item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
 .item-text {
   font-size: 16px;
   font-weight: 500;
+}
+
+.item-translation {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
 }
 
 .play-btn {

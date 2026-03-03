@@ -45,13 +45,32 @@ function getGroupColor(groupId: number | null): string {
   return phraseColors[(groupId - 1) % phraseColors.length]
 }
 
+function getChipIndexFromPoint(x: number, y: number): number | null {
+  const el = document.elementFromPoint(x, y)
+  if (!el) return null
+  const chip = el.closest('[data-chip-index]') as HTMLElement | null
+  if (!chip) return null
+  const idx = parseInt(chip.dataset.chipIndex!, 10)
+  return isNaN(idx) ? null : idx
+}
+
 function handleTouchStart(index: number) {
   if (items.value[index].groupId !== null) return
   selectionStart.value = index
   selectionEnd.value = index
 }
 
-function handleTouchMove(index: number) {
+function handleTouchMoveEvent(e: TouchEvent) {
+  if (selectionStart.value === null) return
+  const touch = e.touches[0]
+  if (!touch) return
+  const idx = getChipIndexFromPoint(touch.clientX, touch.clientY)
+  if (idx === null) return
+  if (items.value[idx].groupId !== null) return
+  selectionEnd.value = idx
+}
+
+function handleMouseMove(index: number) {
   if (selectionStart.value === null) return
   if (items.value[index].groupId !== null) return
   selectionEnd.value = index
@@ -131,16 +150,21 @@ async function confirmAdd() {
     <div class="page-content">
       <TopBanner type="info" message="滑动选中连续单词可合并为短语" />
 
-      <div class="chips-container" @touchend="handleTouchEnd" @mouseup="handleTouchEnd">
+      <div
+        class="chips-container"
+        @touchmove.prevent="handleTouchMoveEvent"
+        @touchend="handleTouchEnd"
+        @mouseup="handleTouchEnd"
+      >
         <span
           v-for="(item, idx) in items"
           :key="idx"
+          :data-chip-index="idx"
           :class="['chip', { selecting: isInSelection(idx), grouped: item.groupId !== null }]"
           :style="item.groupId !== null ? { background: getGroupColor(item.groupId), color: '#fff' } : {}"
           @touchstart.prevent="handleTouchStart(idx)"
-          @touchmove.prevent="handleTouchMove(idx)"
           @mousedown="handleTouchStart(idx)"
-          @mouseover="handleTouchMove(idx)"
+          @mouseover="handleMouseMove(idx)"
         >
           {{ item.text }}
         </span>
